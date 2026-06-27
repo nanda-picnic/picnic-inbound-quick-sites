@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createFolder } from "@/lib/actions";
 
@@ -13,28 +13,31 @@ export default function CreateFolderModal({ currentPath, onClose }: Props) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    if (done && !isPending) onClose();
+  }, [done, isPending, onClose]);
 
   async function submit() {
     const trimmed = name.trim();
     if (!trimmed) return setError("Please enter a folder name.");
-    if (/[/\\]/.test(trimmed)) return setError("Folder name cannot contain slashes.");
+    if (/[/\\]/.test(trimmed))
+      return setError("Folder name cannot contain slashes.");
 
-    setLoading(true);
     setError("");
-
     const path =
       currentPath === "/" ? `/${trimmed}` : `${currentPath}/${trimmed}`;
     const result = await createFolder(path);
 
     if (result?.error) {
       setError(result.error);
-      setLoading(false);
       return;
     }
 
-    router.refresh();
-    onClose();
+    setDone(true);
+    startTransition(() => router.refresh());
   }
 
   return (
@@ -51,6 +54,9 @@ export default function CreateFolderModal({ currentPath, onClose }: Props) {
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && submit()}
           placeholder="Folder name"
+          autoCorrect="off"
+          autoComplete="off"
+          spellCheck={false}
           className="w-full rounded-md border border-zinc-200 px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-zinc-400"
         />
 
@@ -65,10 +71,10 @@ export default function CreateFolderModal({ currentPath, onClose }: Props) {
           </button>
           <button
             onClick={submit}
-            disabled={loading}
+            disabled={isPending}
             className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
           >
-            Create
+            {isPending ? "Creating…" : "Create"}
           </button>
         </div>
       </div>

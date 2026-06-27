@@ -1,5 +1,7 @@
+export const dynamic = "force-dynamic";
+
 import { auth } from "@/auth";
-import { getManifest, saveManifest } from "@/lib/manifest";
+import { getManifest } from "@/lib/manifest";
 import { usernameFromEmail } from "@/lib/utils";
 import { Manifest, FolderEntry, FileEntry } from "@/lib/types";
 import FileManager from "@/components/FileManager";
@@ -37,13 +39,7 @@ export default async function Home({
   const { path } = await searchParams;
   const currentPath = path && path.startsWith("/") ? path : "/";
 
-  let manifest = await getManifest(username);
-
-  // First login: manifest is empty, save it to initialise the user's blob
-  if (manifest.folders.length === 0 && manifest.files.length === 0) {
-    await saveManifest(username, manifest);
-  }
-
+  const manifest = await getManifest(username);
   const { folders, files } = getItemsAtPath(manifest, currentPath);
 
   return (

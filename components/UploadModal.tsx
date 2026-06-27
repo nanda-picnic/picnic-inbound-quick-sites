@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { uploadFile } from "@/lib/actions";
 
@@ -15,8 +15,14 @@ export default function UploadModal({ currentPath, onClose }: Props) {
   const [access, setAccess] = useState<"public" | "restricted">("public");
   const [allowedUsers, setAllowedUsers] = useState<string[]>([]);
   const [userInput, setUserInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    if (done && !isPending) onClose();
+  }, [done, isPending, onClose]);
 
   async function submit(force = false) {
     const file = fileRef.current?.files?.[0];
@@ -28,8 +34,8 @@ export default function UploadModal({ currentPath, onClose }: Props) {
       );
     }
 
-    setLoading(true);
     setError("");
+    setUploading(true);
 
     const fd = new FormData();
     fd.append("file", file);
@@ -38,14 +44,21 @@ export default function UploadModal({ currentPath, onClose }: Props) {
     fd.append("allowedUsers", JSON.stringify(allowedUsers));
     if (force) fd.append("force", "true");
 
-    const result = await uploadFile(fd);
+    let result;
+    try {
+      result = await uploadFile(fd);
+    } catch (e) {
+      setUploading(false);
+      setError(
+        e instanceof Error ? e.message : "Upload failed. Please try again."
+      );
+      return;
+    }
+    setUploading(false);
 
     if (result?.conflict) {
-      setLoading(false);
       if (
-        confirm(
-          `A file named "${file.name}" already exists here. Replace it?`
-        )
+        confirm(`A file named "${file.name}" already exists here. Replace it?`)
       ) {
         await submit(true);
       }
@@ -54,12 +67,11 @@ export default function UploadModal({ currentPath, onClose }: Props) {
 
     if (result?.error) {
       setError(result.error);
-      setLoading(false);
       return;
     }
 
-    router.refresh();
-    onClose();
+    setDone(true);
+    startTransition(() => router.refresh());
   }
 
   function addUser() {
@@ -172,10 +184,10 @@ export default function UploadModal({ currentPath, onClose }: Props) {
             </button>
             <button
               onClick={() => submit(false)}
-              disabled={loading}
+              disabled={uploading || isPending}
               className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
             >
-              {loading ? "Uploading…" : "Upload"}
+              {uploading ? "Uploading…" : isPending ? "Finishing…" : "Upload"}
             </button>
           </div>
         </div>

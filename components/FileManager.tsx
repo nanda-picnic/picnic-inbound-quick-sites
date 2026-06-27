@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { deleteFile, deleteFolder } from "@/lib/actions";
@@ -23,6 +23,7 @@ export default function FileManager({
   email,
 }: Props) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [showUpload, setShowUpload] = useState(false);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [accessFile, setAccessFile] = useState<FileEntry | null>(null);
@@ -38,18 +39,13 @@ export default function FileManager({
   async function handleDeleteFile(uniqueName: string, name: string) {
     if (!confirm(`Delete "${name}"?`)) return;
     await deleteFile(uniqueName);
-    router.refresh();
+    startTransition(() => router.refresh());
   }
 
   async function handleDeleteFolder(path: string, name: string) {
-    if (
-      !confirm(
-        `Delete folder "${name}" and all its contents? This cannot be undone.`
-      )
-    )
-      return;
+    if (!confirm(`Delete folder "${name}" and all its contents? This cannot be undone.`)) return;
     await deleteFolder(path);
-    router.refresh();
+    startTransition(() => router.refresh());
   }
 
   function copyLink(uniqueName: string) {
