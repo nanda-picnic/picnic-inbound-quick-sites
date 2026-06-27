@@ -6,6 +6,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: {
+        params: { hd: "teampicnic.com" },
+      },
     }),
   ],
   callbacks: {
