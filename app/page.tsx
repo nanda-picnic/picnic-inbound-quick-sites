@@ -1,29 +1,57 @@
-import { auth, signOut } from "@/auth";
+import { auth } from "@/auth";
+import { getManifest, saveManifest } from "@/lib/manifest";
+import { usernameFromEmail } from "@/lib/utils";
+import { Manifest, FolderEntry, FileEntry } from "@/lib/types";
+import FileManager from "@/components/FileManager";
 
-export default async function Home() {
+function getItemsAtPath(
+  manifest: Manifest,
+  currentPath: string
+): { folders: FolderEntry[]; files: FileEntry[] } {
+  const prefix = currentPath === "/" ? "" : currentPath;
+
+  const folders = manifest.folders.filter((f) => {
+    if (!f.path.startsWith(prefix + "/")) return false;
+    const rest = f.path.slice(prefix.length + 1);
+    return !rest.includes("/");
+  });
+
+  const files = manifest.files.filter((f) => {
+    if (!f.path.startsWith(prefix + "/")) return false;
+    const rest = f.path.slice(prefix.length + 1);
+    return !rest.includes("/");
+  });
+
+  return { folders, files };
+}
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ path?: string }>;
+}) {
   const session = await auth();
+  const email = session!.user!.email!;
+  const username = usernameFromEmail(email);
+
+  const { path } = await searchParams;
+  const currentPath = path && path.startsWith("/") ? path : "/";
+
+  let manifest = await getManifest(username);
+
+  // First login: manifest is empty, save it to initialise the user's blob
+  if (manifest.folders.length === 0 && manifest.files.length === 0) {
+    await saveManifest(username, manifest);
+  }
+
+  const { folders, files } = getItemsAtPath(manifest, currentPath);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white dark:bg-black">
-      <div className="flex flex-col items-center gap-4">
-        <h1 className="text-2xl font-medium tracking-tight text-zinc-900 dark:text-zinc-100">
-          Welcome to Picnic QuikSites
-        </h1>
-        <p className="text-sm text-zinc-500">{session?.user?.email}</p>
-        <form
-          action={async () => {
-            "use server";
-            await signOut({ redirectTo: "/login" });
-          }}
-        >
-          <button
-            type="submit"
-            className="text-xs text-zinc-400 underline underline-offset-2 hover:text-zinc-600"
-          >
-            Sign out
-          </button>
-        </form>
-      </div>
-    </div>
+    <FileManager
+      folders={folders}
+      files={files}
+      currentPath={currentPath}
+      email={email}
+    />
   );
 }
