@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateAccess } from "@/lib/actions";
 import type { FileEntry } from "@/lib/types";
@@ -17,8 +17,13 @@ export default function AccessModal({ file, onClose }: Props) {
     file.allowedUsers ?? []
   );
   const [userInput, setUserInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    if (done && !isPending) onClose();
+  }, [done, isPending, onClose]);
 
   function addUser() {
     const u = userInput.trim().toLowerCase().replace(/@teampicnic\.com$/, "");
@@ -29,16 +34,14 @@ export default function AccessModal({ file, onClose }: Props) {
   }
 
   async function save() {
-    setLoading(true);
     setError("");
     const result = await updateAccess(file.uniqueName, access, allowedUsers);
     if (result?.error) {
       setError(result.error);
-      setLoading(false);
       return;
     }
-    router.refresh();
-    onClose();
+    setDone(true);
+    startTransition(() => router.refresh());
   }
 
   return (
@@ -129,10 +132,10 @@ export default function AccessModal({ file, onClose }: Props) {
             </button>
             <button
               onClick={save}
-              disabled={loading}
+              disabled={isPending}
               className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
             >
-              Save
+              {isPending ? "Saving…" : "Save"}
             </button>
           </div>
         </div>
